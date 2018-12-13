@@ -1,0 +1,96 @@
+#---
+#project: "Aletheia"
+#title: InitializePopulation.Rmd
+#output: html_notebook
+#location: ~/Documents/In Process/ASM Final Project/Aletheia
+
+#university: University of Colorado at Denver
+#class: MATH 6388
+#professor: Audrey Hendricks
+
+#author: Kathleen Gatliffe
+#date: 9 November 2018
+#---
+
+# This file creates the population data file for the Aletheia project.
+
+```{r}
+setwd("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia")
+
+library(stats)
+library(dplyr)
+library(hash)
+library(ggplot2)
+library(ReinforcementLearning)
+library(testthat)
+library(wesanderson)
+```
+
+# Load function file, parameters, color palettes.
+
+```{r}
+source("AllKFunctions.R")
+source("Parameters.R")
+source("AllKPalettes.R")
+```
+
+# Load parameters.
+
+```{r}
+Parameters<-LoadParameters()
+```
+
+# This is the population seeding routine.
+
+```{r}
+
+set.seed=(Parameters$seed)
+
+PopulationN = data.frame(matrix(vector(), 0, 14, dimnames=list(c(), c("ID", "Type","Vulnerable","VulnWeight","VulnTot","Criminal","CrimWeight","CrimTot","Suspicious","SuspWeight","SuspTot","DetainState","IgnoreHistory","DetainHistory"))),stringsAsFactors=F)
+Person = data.frame(matrix(vector(), 1, 14, dimnames=list(c(), c( "ID", "Type","Vulnerable","VulnWeight","VulnTot","Criminal","CrimWeight","CrimTot", "Suspicious","SuspWeight","SuspTot","DetainState","IgnoreHistory","DetainHistory"))),stringsAsFactors=F)
+for (i in 1:Parameters$pop)
+{
+Person$ID <-i 
+Person$Type <- sample(1:2, 1, replace=T,prob=c(1-Parameters$percgroup,Parameters$percgroup))
+Person$Vulnerable<-sample(100,1,replace=T)/100
+Person$VulnWeight <- 0
+Person$VulnTot <-Person$Vulnerable+Person$VulnWeight
+Person$Criminal <- rlnorm(1, log(5), log(1.25))/10
+Person$CrimWeight <- 0
+Person$CrimTot <-Person$Criminal+Person$CrimWeight
+Person$Suspicious <- (Person$CrimTot+.5*Person$VulnTot+1+rlnorm(1, log(5), log(1.25)))/15
+Person$SuspWeight <- 0
+Person$SuspTot <-Person$Suspicious+Person$SuspWeight
+roundedsusp<-round(Person$SuspTot*100)
+Person$DetainState<-sprintf("%03d",roundedsusp)
+Person$IgnoreHistory <- 0
+Person$DetainHistory <- 0
+
+if(Person$Type=="1"){Person$TypeW="Not Target"}
+else {Person$TypeW="Target"}
+PopulationN<-rbind(PopulationN,Person)
+
+}
+
+save(PopulationN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopulationN.",Parameters$seed,".rda"))
+write.csv(PopulationN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopulationN.",Parameters$seed,".csv"),row.names=FALSE)
+```
+
+# Reweighting Suspicious. This chunk creates a version of population where the only 
+#change is that type 2 is rated more suspicious.
+
+```{r}
+PopulationY<-PopulationN
+  for (j in 1:Parameters$pop)
+{
+    if (PopulationY$Type[j]=="2")
+PopulationY$Suspicious[j] <- PopulationY$Suspicious[j]*(1+Parameters$bias)
+    Person$SuspWeight <- 0
+PopulationY$SuspTot <-PopulationY$Suspicious+PopulationY$SuspWeight
+roundedsusp<-round(PopulationY$SuspTot*100)
+PopulationY$DetainState<-sprintf("%03d",roundedsusp)
+  }
+
+save(PopulationY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopulationY.",Parameters$seed,".", Parameters$bias,".rda"))
+write.csv(PopulationY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopulationY.",Parameters$seed,".", Parameters$bias,".csv"),row.names=FALSE)
+```

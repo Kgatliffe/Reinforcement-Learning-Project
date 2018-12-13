@@ -1,0 +1,137 @@
+---
+project: "Aletheia"
+title: Graphics.Rmd
+output: html_notebook
+location: ~/Documents/In Process/ASM Final Project/Aletheia
+
+university: University of Colorado at Denver
+class: MATH 6388
+professor: Audrey Hendricks
+
+author: Kathleen Gatliffe
+date: 9 November 2018
+---
+
+```{r}
+setwd("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia")
+
+library(stats)
+library(dplyr)
+library(hash)
+library(ggplot2)
+library(ggpubr)
+library(ReinforcementLearning)
+library(testthat)
+library(wesanderson)
+```
+
+Load function file, parameters, color palettes.
+
+```{r}
+source("AllKFunctions.R")
+source("Parameters.R")
+source("AllKPalettes.R")
+```
+
+load population data files
+
+```{r}
+load("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopulationN.7013.rda")
+load("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopulationY.7013.0.1.rda")
+load("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/DataFiles/TownMap.7013.rda")
+load("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/DataFiles/PopCoord.7013.rda")
+
+```
+
+Population graphs and charts.
+
+```{r}
+save(PopulationN, file = paste0(Parameters$seed,".PopulationN.rda"))
+summary(PopulationN)
+
+PopulationN$TypeW<-factor(PopulationN$TypeW)
+PopulationY$TypeW<-factor(PopulationY$TypeW)
+
+VvsS<-ggplot(PopulationN, aes(x=Vulnerable, y=Suspicious, color=TypeW)) +
+  geom_point()+  
+  scale_color_manual(values=c('#63b8ff','#e066ff'))
+
+CvsV<-ggplot(PopulationN, aes(x=Criminal, y=Vulnerable, color=TypeW)) +
+  geom_point()+  
+  scale_color_manual(values=c('#63b8ff','#e066ff'))
+
+CvsSNoWeight<-ggplot(PopulationN, aes(x=Criminal, y=Suspicious, color=TypeW)) +
+  geom_point()+ geom_smooth(method = "lm")+ 
+  scale_color_manual(values=c('#63b8ff','#e066ff'))+labs(title=paste0("No Prejudice Weight"))
+
+CvsSWeight<-ggplot(PopulationY, aes(x=Criminal, y=Suspicious, color=TypeW)) +
+  geom_point()+ geom_smooth(method = "lm")+ scale_color_manual(values=c('#63b8ff','#e066ff'))+labs(title=paste0((Parameters$bias)*100,"% Percent Prejudice Weight"))
+
+HistV<-ggplot(PopulationN, aes(x=Vulnerable)) +
+ geom_histogram(aes(y=..density..), colour="black", bins = 20, fill="#e066ff")+
+ geom_density(alpha=.2, fill="#e066ff") 
+
+HistC<-ggplot(PopulationN, aes(x=Criminal)) +
+ geom_histogram(aes(y=..density..), colour="black", bins = 20, fill="#9aff9a")+
+ geom_density(alpha=.2, fill="#9aff9a") 
+
+HistSNoWeight<-ggplot(PopulationN, aes(x=Suspicious)) +
+ geom_histogram(aes(y=..density..), colour="black", bins = 20, fill="#63b8ff")+
+ geom_density(alpha=.2, fill="#63b8ff")+labs(title="No Prejudice Weight")
+
+HistSWeight<-ggplot(PopulationY, aes(x=Suspicious)) +
+ geom_histogram(aes(y=..density..), colour="black", bins = 20, fill="#63b8ff")+
+ geom_density(alpha=.2, fill="#63b8ff")+labs(title=paste0((Parameters$bias)*100,"% Percent Prejudice Weight"))
+
+ggarrange(VvsS,CvsV,
+                    ncol = 1, nrow = 2) 
+
+#ggarrange(CvsSNoWeight,CvsSWeight,
+#                    ncol = 1, nrow = 2) 
+
+CvsSNoWeight
+
+CvsSWeight
+
+ggarrange(HistV, HistC,
+                    ncol = 1, nrow = 2)
+ggarrange(HistSNoWeight, HistSWeight,
+                    ncol = 1, nrow = 2)
+```
+Graphs comparing the weighted and unweighted populations.
+
+```{r}
+
+bxpV<-ggplot(PopulationN, aes(x = TypeW, y=Vulnerable, fill=TypeW))+geom_boxplot()+scale_fill_manual(values=c("#63b8ff","#9aff9a"))+ theme(legend.position="none")
+
+bxpC<-ggplot(PopulationN, aes(x = TypeW, y=Criminal, fill=TypeW))+geom_boxplot()+scale_fill_manual(values=c("#63b8ff","#9aff9a"))+theme(legend.position="none")
+
+bxpSNW<-ggplot(PopulationN, aes(x = TypeW, y=Suspicious, fill=TypeW))+geom_boxplot()+scale_fill_manual(values=c("#63b8ff","#e066ff"))+labs(title="No Prejudice Weight")+ theme(legend.position="none")
+
+bxpSW<-ggplot(PopulationY, aes(x = TypeW, y=Suspicious, fill=TypeW))+geom_boxplot()+scale_fill_manual(values=c("#63b8ff","#e066ff"))+labs(title=paste0((Parameters$bias)*100,"% Percent Prejudice Weight"))+ theme(legend.position="none")
+
+ggarrange(bxpV, bxpC,
+                    ncol = 2, nrow = 1)
+ggarrange(bxpSNW, bxpSW,
+                    ncol = 2, nrow = 1)
+```
+
+Populated Town Map Graphs.
+
+```{r}
+crimplot<-ggplot(PopCoord, aes(x=X, y=Y, shape=factor(Type), color=Criminal)) +
+  geom_point(size = 5)
+crimplot+scale_color_gradient(low="#63b8ff", high="#e066ff")
+
+susplot<-ggplot(PopCoord, aes(x=X, y=Y, shape=factor(Type), color=Suspicious)) +
+  geom_point(size = 5)
+susplot+scale_color_gradient(low="#63b8ff", high="#9aff9a")
+
+susplot<-ggplot(PopCoordY, aes(x=X, y=Y, shape=factor(TypeW), color=Suspicious)) +
+  geom_point(size = 5)
+susplot+scale_color_gradient(low="#63b8ff", high="#e066ff")
+
+vulnplot<-ggplot(PopCoord, aes(x=X, y=Y, shape=factor(TypeW), color=Vulnerable)) +
+  geom_point(size = 5)
+vulnplot+scale_color_gradient(low="#63b8ff", high="#9aff9a")
+```

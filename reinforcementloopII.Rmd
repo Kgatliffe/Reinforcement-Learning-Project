@@ -1,0 +1,57 @@
+#---
+#project: "Aletheia"
+#title: reinforcementloopII.Rmd
+#output: html_notebook
+#location: ~/Documents/In Process/ASM Final Project/Aletheia
+
+#university: University of Colorado at Denver
+#class: MATH 6388
+#professor: Audrey Hendricks
+
+#author: Kathleen Gatliffe
+#date: 25 November 2018
+#---
+
+# This is a modification of Engine II which allows for the reinforcement learning
+# step to be run over and over to refine the algorithm.
+
+#The map is generated fresh each day with a different set of persons
+# from the population.
+
+
+```{r}
+
+for (iii in 1:99)
+{
+iteration=iteration+1
+
+origin<-sample(nrow(TownMap),1,replace=T)
+StateMatrixN<-AssignState(origin,TownMap,Parameters,Actions)
+StateMatrixY<-AssignState(origin,TownMapY,Parameters,Actions)
+
+StatesN=unique(StateMatrixN$State)
+
+StatesY=unique(StateMatrixY$State)
+
+data_newY <- sampleExperienceX(StateMatrixY,Parameters$N, env=MiniStateMatrix, states=StatesY, actions=Actions, 
+                             model = TheModelY, actionSelection = "epsilon-greedy", 
+                             control = Control)
+data_newN <- sampleExperienceX(StateMatrixN,Parameters$N, env=MiniStateMatrix, states=StatesN, actions=Actions, 
+                             model = TheModelN, actionSelection = "epsilon-greedy", 
+                             control = Control)
+
+#data_newM <- sampleExperienceX(StateMatrixN,Parameters$N, env=MiniStateMatrix, states=StatesN, actions=Actions, 
+#                             model = TheModelY, actionSelection = "epsilon-greedy", 
+#                             control = Control)
+
+TheModelN<-ReinforcementLearning(data_newN, s="State", a="Action", r="Reward", s_new="NextState", control=Control, model=TheModelN)
+
+TheModelY<-ReinforcementLearning(data_newY, s="State", a="Action", r="Reward", s_new="NextState", control=Control, model=TheModelY)
+
+plot(TheModelN)
+plot(TheModelY)
+
+summary(TheModelN)
+summary(TheModelY)
+}
+```

@@ -1,0 +1,232 @@
+#---
+#project: "Aletheia"
+#title: EngineIII.Rmd
+#output: html_notebook
+#location: ~/Documents/In Process/ASM Final Project/Aletheia
+
+#university: University of Colorado at Denver
+#class: MATH 6388
+#professor: Audrey Hendricks
+
+#author: Kathleen Gatliffe
+#date: 9 November 2018
+---
+
+# This is the main engine for the project
+```{r}
+setwd("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia")
+
+library(stats)
+library(dplyr)
+library(hash)
+library(ggplot2)
+library(ReinforcementLearning)
+#library(testthat)
+#library(wesanderson)
+```
+
+#Load function file, parameters, color palettes.
+
+```{r}
+source("AllKFunctionsII.R")
+source("Parameters.R")
+source("AllKPalettes.R")
+```
+
+```{r}
+load("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopulationN.7013.rda")
+load("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopulationY.7013.0.1.rda")
+```
+##
+#Run InitializePopulation.RMD Script to generate datasets with and without bias.
+
+##
+#No longer Tabula Rasa, the AI awakes. Sets actions (D: Detain, N: North, S: South, # W: West, E:East)
+
+```{r}
+
+Parameters<-LoadParameters()
+
+Actions <- c("D", "N", "S", "W", "E")
+
+AIMemory<-data.frame(matrix(vector(), 1, 4, dimnames=list(c(), c("State","Action","Reward","NextState"))),stringsAsFactors=F)
+AIMemory$State=0
+AIMemory$Action=0
+AIMemory$Reward=0
+AIMemory$NextState=0
+Control<-list(alpha=Parameters$alpha,gamma=Parameters$gamma,epsilon=Parameters$epsilon)
+```
+
+#The town map matrix. The map contains an entry for every block. 
+
+```{r}
+TownMap=data.frame(matrix(vector(), 0, 18, dimnames=list(c(), c("X","Y","Flag","ID","Type","Vulnerable","VulnWeight","VulnTot","Criminal", "CrimWeight","CrimTot","Suspicious", "SuspWeight","SuspTot","DetainState","IgnoreHistory","DetainHistory","TypeW"))),stringsAsFactors=F)
+
+TownMapLoc = data.frame(matrix(vector(), 1, 1, dimnames=list(c(), c( "X"))),stringsAsFactors=F)
+for (i in 1:Parameters$cols){
+  for(j in 1:Parameters$rows){
+    TownMapLoc$X<-i
+    TownMapLoc$Y<-j
+    TownMapLoc$Flag<-0
+    TownMapLoc$ID<-0
+    TownMapLoc$Type<-0
+    TownMapLoc$Vulnerable<-0
+    TownMapLoc$VulnWeight<-0
+    TownMapLoc$VulnTot<-0
+    TownMapLoc$Criminal<-0
+    TownMapLoc$CrimWeight<-0
+    TownMapLoc$CrimTot<-0
+    TownMapLoc$Suspicious<-0
+    TownMapLoc$SuspWeight<-0
+    TownMapLoc$SuspTot<-0
+    TownMapLoc$DetainState<-sprintf("%03d",0)
+    TownMapLoc$IgnoreHistory<-0
+    TownMapLoc$DetainHistory<-0
+    TownMapLoc$TypeW<-0    
+  TownMap<-rbind(TownMap,TownMapLoc)
+  }
+}
+```
+
+#Seeding the Town Map. This routine adds the population to the map. The blocks that 
+#are populated now contain the data on the person located there.
+
+```{r}
+
+if (Parameters$biasYN==0){Population<-PopulationN}
+if (Parameters$biasYN==1){Population<-PopulationY}
+
+PopCoord<-MakePop(Population, Parameters)
+PopCoordY<-PopCoord
+TownMap<- MakeMap(PopCoord, TownMap)
+TownMap$Type<-factor(TownMap$Type)
+TownMapY<-TownMap
+
+for(i in 1:nrow(TownMapY))
+{
+for(j in 1:nrow(PopulationY)) 
+{
+  if (TownMapY$ID[i]==PopulationY$ID[j])
+  {
+    TownMapY$Suspicious[i]=PopulationY$Suspicious[j]
+    TownMapY$SuspWeight[i]=PopulationY$SuspWeight[j]
+    TownMapY$SuspTot[i]=PopulationY$SuspTot[j]
+    TownMapY$DetainState[i]= PopulationY$DetainState[j] 
+  }
+}
+}
+
+for(i in 1:nrow(PopCoordY))
+{
+for(j in 1:nrow(PopulationY)) 
+{
+  if (PopCoordY$ID[i]==PopulationY$ID[j])
+  {
+    PopCoordY$Suspicious[i]=PopulationY$Suspicious[j]
+    PopCoordY$SuspWeight[i]=PopulationY$SuspWeight[j]
+    PopCoordY$SuspTot[i]=PopulationY$SuspTot[j]
+    PopCoordY$DetainState[i]= PopulationY$DetainState[j] 
+  }
+}
+}
+iteration=1
+save(PopCoord, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopCoord.",Parameters$seed,".",iteration,".rda"))
+write.csv(PopulationY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopCoord.",Parameters$seed,".",iteration,".csv"),row.names=FALSE)
+
+save(TownMap, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TownMap.",Parameters$seed,".",iteration,".rda"))
+write.csv(TownMap, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TownMap.",Parameters$seed,".",iteration,".csv"),row.names=FALSE)
+save(TownMapY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TownMapY.",Parameters$seed,".",iteration,".rda"))
+write.csv(TownMapY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TownMapY.",Parameters$seed,".",iteration,".csv"),row.names=FALSE)
+```
+
+# Setting up a complete list of states
+
+```{r}
+origin<-sample(nrow(TownMap),1,replace=T)
+StateMatrixN<-AssignState(origin,TownMap,Parameters,Actions)
+StateMatrixY<-AssignState(origin,TownMapY,Parameters,Actions)
+#View(StateMatrixN)
+#View(TownMap)
+```
+
+
+```{r}
+StatesN=unique(StateMatrixN$State)
+AIMemoryN<-sampleExperienceX(StateMatrixN,Parameters$N, MiniStateMatrix, StatesN, Actions, actionSelection = "random", control = Control, model = NULL)
+save(AIMemoryN, file = paste0("AIMemory.",Parameters$seed,".",iteration,".rda"))
+
+StatesY=unique(StateMatrixY$State)
+AIMemoryY<-sampleExperienceX(StateMatrixY,Parameters$N, MiniStateMatrix, StatesY, Actions, actionSelection = "random", control = Control, model = NULL)
+save(AIMemoryY, file = paste0("AIMemoryY.",Parameters$seed,".",iteration,".rda"))
+
+save(StateMatrixN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/StateMatrix.",Parameters$seed,".",iteration,".rda"))
+save(StateMatrixY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/StateMatrixY.",Parameters$seed,".",iteration,".rda"))
+write.csv(StateMatrixY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/StateMatrixY.",Parameters$seed,".",iteration,".csv"),row.names=TRUE)
+write.csv(StateMatrixN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/StateMatrix.",Parameters$seed,".",iteration,".csv"),row.names=TRUE)
+
+```
+
+# The initial model. This model is taken directly from a sample of states.
+```{r}
+TheModelN<-ReinforcementLearning(AIMemoryN, s="State", a="Action", r="Reward", s_new="NextState", control=Control)
+TheModelY<-ReinforcementLearning(AIMemoryY, s="State", a="Action", r="Reward", s_new="NextState", control=Control)
+```
+
+#Saving the policy portion of the model.
+```{r}
+PolicyN<-(TheModelN$Policy)
+
+save(PolicyN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PolicyN.",Parameters$seed,".",iteration,".rda"))
+write.csv(PolicyN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PolicyN.",Parameters$seed,".",iteration,".csv"),row.names=TRUE)
+
+PolicyY<-(TheModelY$Policy)
+
+save(PolicyY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PolicyY.",Parameters$seed,".",iteration,".rda"))
+write.csv(PolicyY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PolicyY.",Parameters$seed,".",iteration,".csv"),row.names=TRUE)
+```
+
+#Determining the Ideal Game (Not working as the model does not return a policy for all states)
+
+```{r}
+
+#source("ComparePolicy.R")
+#xstep=TownMap$X[origin]
+#ystep=TownMap$Y[origin]
+#timestep=Parameters$daylength
+#StateMatrix<-StateMatrixN
+#PolicyN<- read.csv("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/PolicyN.7013.csv")
+#PolicyY<- read.csv("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/PolicyY.7013.csv")
+# GameHistoryN<-ComparePolicy(xstep,ystep,timestep,PolicyN, Parameters,StateMatrixN)
+# GameHistoryY<-ComparePolicy(xstep,ystep,timestep,PolicyY, Parameters,StateMatrixY)
+# View(GameHistoryN)
+# View(GameHistoryY)
+```
+
+# Updating the data with new information
+
+```{r eval=FALSE, include=FALSE}
+data_newY <- sampleExperienceX(StateMatrixY,Parameters$N, env=MiniStateMatrix, states=StatesY, actions=Actions, 
+                             model = TheModelY, actionSelection = "epsilon-greedy", 
+                             control = Control)
+data_newN <- sampleExperienceX(StateMatrixN,Parameters$N, env=MiniStateMatrix, states=StatesN, actions=Actions, 
+                             model = TheModelN, actionSelection = "epsilon-greedy", 
+                             control = Control)
+```
+Creating a new model using the initial model and the new data
+
+```{r eval=FALSE, include=FALSE}
+model_newN<-ReinforcementLearning(data_newN, s="State", a="Action", r="Reward", s_new="NextState", control=Control, model=model_newN)
+model_newY<-ReinforcementLearning(data_newY, s="State", a="Action", r="Reward", s_new="NextState", control=Control, model=model_newY)
+
+plot(model_newN)
+plot(model_newY)
+
+summary(model_newN)
+summary(model_newY)
+
+save(model_newN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/model_newN.",Parameters$seed,".",iteration,".rda"))
+write.csv(model_newN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/model_newN.",Parameters$seed,".",iteration,".csv"),row.names=TRUE)
+
+save(Model_newY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/model_newY.",Parameters$seed,".",iteration,".rda"))
+write.csv(model_newY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/model_newY.",Parameters$seed,".",iteration,".csv"),row.names=TRUE)
+```

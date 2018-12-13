@@ -1,0 +1,130 @@
+#---
+#project: "Aletheia"
+#title: reinforcementloop.Rmd
+#output: html_notebook
+#location: ~/Documents/In Process/ASM Final Project/Aletheia
+
+#university: University of Colorado at Denver
+#class: MATH 6388
+#professor: Audrey Hendricks
+
+#author: Kathleen Gatliffe
+#date: 25 November 2018
+#---
+
+# This is a modification of Engine II which allows for the reinforcement learning
+# step to be run over and over to refine the algorithm.
+
+#The map is generated fresh each day with a different set of persons
+# from the population.
+
+
+```{r}
+
+for (iii in 1:5)
+{
+iteration=iteration+1
+TownMap=data.frame(matrix(vector(), 0, 17, dimnames=list(c(), c("X","Y","Flag","ID","Type","Vulnerable","VulnWeight","VulnTot","Criminal", "CrimWeight","CrimTot","Suspicious", "SuspWeight","SuspTot","DetainState","IgnoreHistory","DetainHistory"))),stringsAsFactors=F)
+
+TownMapLoc = data.frame(matrix(vector(), 1, 1, dimnames=list(c(), c( "X"))),stringsAsFactors=F)
+for (i in 1:Parameters$cols){
+  for(j in 1:Parameters$rows){
+    TownMapLoc$X<-i
+    TownMapLoc$Y<-j
+    TownMapLoc$Flag<-0
+    TownMapLoc$ID<-0
+    TownMapLoc$Type<-0
+    TownMapLoc$Vulnerable<-0
+    TownMapLoc$VulnWeight<-0
+    TownMapLoc$VulnTot<-0
+    TownMapLoc$Criminal<-0
+    TownMapLoc$CrimWeight<-0
+    TownMapLoc$CrimTot<-0
+    TownMapLoc$Suspicious<-0
+    TownMapLoc$SuspWeight<-0
+    TownMapLoc$SuspTot<-0
+    TownMapLoc$DetainState<-sprintf("%03d",0)
+    TownMapLoc$IgnoreHistory<-0
+    TownMapLoc$DetainHistory<-0
+  TownMap<-rbind(TownMap,TownMapLoc)
+  }
+}
+
+if (Parameters$biasYN==0){Population<-PopulationN}
+if (Parameters$biasYN==1){Population<-PopulationY}
+
+PopCoord<-MakePop(Population, Parameters)
+TownMap<- MakeMap(PopCoord, TownMap)
+TownMap$Type<-factor(TownMap$Type)
+TownMapY<-TownMap
+
+for(i in 1:nrow(TownMapY))
+{
+for(j in 1:nrow(PopulationY)) 
+{
+  if (TownMapY$ID[i]==PopulationY$ID[j])
+  {
+    TownMapY$Suspicious[i]=PopulationY$Suspicious[j]
+    TownMapY$SuspWeight[i]=PopulationY$SuspWeight[j]
+    TownMapY$SuspTot[i]=PopulationY$SuspTot[j]
+    TownMapY$DetainState[i]= PopulationY$DetainState[j] 
+  }
+}
+}
+#save(PopCoord, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopCoord.",Parameters$seed,".",iteration,".rda"))
+#write.csv(PopulationY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/PopCoord.",Parameters$seed,".",iteration,".csv"),row.names=FALSE)
+
+#save(TownMap, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TownMap.",Parameters$seed,".",iteration,".rda"))
+#write.csv(TownMap, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TownMap.",Parameters$seed,".",iteration,".csv"),row.names=FALSE)
+#save(TownMapY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TownMapY.",Parameters$seed,".",iteration,".rda"))
+#write.csv(TownMapY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TownMapY.",Parameters$seed,".",iteration,".csv"),row.names=FALSE)
+
+origin<-sample(nrow(TownMap),1,replace=T)
+StateMatrixN<-AssignState(origin,TownMap,Parameters,Actions)
+StateMatrixY<-AssignState(origin,TownMapY,Parameters,Actions)
+#View(StateMatrixN)
+#View(TownMap)
+
+StatesN=unique(StateMatrixN$State)
+#AIMemoryN<-sampleExperienceX(StateMatrixN,Parameters$N, MiniStateMatrix, StatesN, Actions, actionSelection = "random", control = Control, model = NULL)
+#save(AIMemoryN, file = paste0("AIMemory.",Parameters$seed,".rda"))
+
+StatesY=unique(StateMatrixY$State)
+#AIMemoryY<-sampleExperienceX(StateMatrixY,Parameters$N, MiniStateMatrix, StatesY, Actions, actionSelection = "random", control = Control, model = NULL)
+#save(AIMemoryY, file = paste0("AIMemoryY.",Parameters$seed,".rda"))
+
+#save(StateMatrixN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/StateMatrixN.",Parameters$seed,".",iteration,".rda"))
+#save(StateMatrixY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/StateMatrixY.",Parameters$seed,".",iteration,".rda"))
+#write.csv(StateMatrixY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/StateMatrixY.",Parameters$seed,".",iteration,".csv"),row.names=TRUE)
+#write.csv(StateMatrixN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/StateMatrixN.",Parameters$seed,".",iteration,".csv"),row.names=TRUE)
+
+data_newY <- sampleExperienceX(StateMatrixY,Parameters$N, env=MiniStateMatrix, states=StatesY, actions=Actions, 
+                             model = TheModelY, actionSelection = "epsilon-greedy", 
+                             control = Control)
+data_newN <- sampleExperienceX(StateMatrixN,Parameters$N, env=MiniStateMatrix, states=StatesN, actions=Actions, 
+                             model = TheModelN, actionSelection = "epsilon-greedy", 
+                             control = Control)
+
+data_newM <- sampleExperienceX(StateMatrixN,Parameters$N, env=MiniStateMatrix, states=StatesN, actions=Actions, 
+                             model = TheModelY, actionSelection = "epsilon-greedy", 
+                             control = Control)
+
+TheModelN<-ReinforcementLearning(data_newN, s="State", a="Action", r="Reward", s_new="NextState", control=Control, model=TheModelN)
+
+TheModelY<-ReinforcementLearning(data_newY, s="State", a="Action", r="Reward", s_new="NextState", control=Control, model=TheModelY)
+
+plot(TheModelN)
+plot(TheModelY)
+
+summary(TheModelN)
+summary(TheModelY)
+
+save(TheModelN, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TheModelN.",Parameters$seed,".",iteration,".rda"))
+
+save(TheModelY, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TheModelY.",Parameters$seed,".",iteration,".rda"))
+
+write.csv(TheModelY$Policy, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TheModelY.",Parameters$seed,".",iteration,".csv"),row.names=TRUE)
+write.csv(TheModelN$Policy, file = paste0("/Users/gatliffe/Documents/In Process/ASM Final Project/Aletheia/Iteration/TheModelN.",Parameters$seed,".",iteration,".csv"),row.names=TRUE)
+
+}
+```
